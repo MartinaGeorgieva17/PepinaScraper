@@ -1,6 +1,5 @@
 import mysql.connector as mc
 from PepinaScraper.read_config import read_db_config
-from .read_config import read_db_config
 
 
 
@@ -34,6 +33,7 @@ class DB():
                 price DECIMAL(10,2) NOT NULL,
                 color VARCHAR(50) NOT NULL,
                 sizes VARCHAR(255) NOT NULL, 
+                link VARCHAR(255) UNIQUE NOT NULL,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
                 CONSTRAINT brand_color_size UNIQUE (brand, color, sizes)
             );
@@ -69,6 +69,7 @@ class DB():
             VALUES (%s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE price=VALUES(price), sizes=VALUES(sizes)
         """
+        data = [(row['brand'], row['price'], row['color'], ",".join(row['sizes'])) for row in rows_data]
         self.check_connection()
         try:
             with self.conn.cursor() as cursor:
@@ -88,6 +89,10 @@ class DB():
         if row_data.get('price', 0) >= 1000:
             print("Цена над 1000 лева не може да бъде добавена!")
             return
+        
+        if not row_data.get('sizes'):
+            print('Липсват размери за обувката, ще се добави "N/A"')
+            row_data['sizes'] = ['N/A']  # Добавяме 'N/A' ако липсват размери
 
         sql = """
             INSERT IGNORE INTO shoes

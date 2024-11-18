@@ -2,7 +2,7 @@ import requests
 import os
 from bs4 import BeautifulSoup
 from PepinaScraper.db import DB
-from PepinaScraper.read_config import read_db_config
+import time
 
 
 class Scraper:
@@ -12,7 +12,7 @@ class Scraper:
         self.db = DB()
 
     def get_html(self, url):
-        filename = './data/obuvki.html'
+        filename = f'./data/obuvki_{int(time.time())}.html'
         headers = {"User-Agent": "Mozilla/5.0"}
 
         if os.path.exists(filename):
@@ -73,11 +73,14 @@ class Scraper:
                         if price < 1000:
                             shoe_data["price"] = price
                         else:
+                            print(f"Пропусната обувка с цена над 1000 лв: {shoe_data}")
                             continue
                     except ValueError:
+                        print(f"Невалидна цена за обувка: {shoe_data}")
                         continue
                 else:
-                    continue
+                    print("Липсва цената на обувка")
+                    continue    #Продължаваме с друга обувка, ако няма цена
             
 
             
@@ -97,6 +100,23 @@ class Scraper:
         else:
             print("Секцията 'Дамски обувки' не беше намерена на страницата.")
 
+    def get_all_pages(self):
+        page = 1
+        all_shoes = []
+        while True:
+            url_with_page = f"{self.url}?page={page}"
+            html = self.get_html(url_with_page)
+            if html:
+                self.parse_data(html)
+                all_shoes.extend(self.shoes)
+                page += 1
+                # Изход, ако няма следваща страница
+                if not self.has_next_page(html):
+                    break
+            else:
+                print("Не беше получен HTML от сайта!")
+                break
+        return all_shoes
 
 
     def sort_by_brand(self):
@@ -110,6 +130,31 @@ class Scraper:
         if html:
             self.parse_data(html)
         return self.shoes
+    
+
+    def fetch_shoes_data(self, max_price=1000, brand_filter=None):
+        html = self.get_html(self.url)
+        if html:
+            self.parse_data(html)
+        # Филтрираме само валидни обувки
+            valid_shoes = [
+                shoe for shoe in self.shoes 
+                if shoe['price'] < max_price and (not brand_filter or shoe['brand'] == brand_filter)
+        ]
+            if not valid_shoes:
+                print("Няма обувки, отговарящи на критериите.")
+            return valid_shoes
+        else:
+            raise Exception("Не успяхме да получим данни.")
+        
+    def save_to_db(self):
+        for shoe in self.shoes:
+        # Предполага се, че имате метод в DB, който проверява за съществуването на обувката по уникален линк
+            if not self.db.does_shoe_exist(shoe['link']):
+                self.db.insert_shoe(shoe)
+        else:
+            print(f"Обувката с линк {shoe['link']} вече съществува в базата данни.")
+
 
 
     def run(self):
@@ -118,6 +163,7 @@ class Scraper:
         try:
             self.db.drop_shoes_table()
             self.db.create_shoes_table()
+            print("Таблиците в базата данни бяха обновени.")
         except Exception as e:
             print(f"Грешка при работа с базата данни: {e}")
             return
@@ -125,7 +171,7 @@ class Scraper:
         html = self.get_html(self.url)
         if html:
             self.parse_data(html)
-            print("Парсингът е завършен, намерени обувки:{len(self.shoes)}!")
+            print(f"Парсингът е завършен, намерени обувки:{len(self.shoes)}!")
         else:
             print(f"Не беше получен HTML от сайта!")
 

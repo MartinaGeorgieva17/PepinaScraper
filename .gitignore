@@ -170,3 +170,5 @@ cython_debug/
 .vscode
 
 *.html
+
+config.ini
