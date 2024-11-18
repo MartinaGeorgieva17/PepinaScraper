@@ -5,6 +5,7 @@ from PepinaScraper.db import DB
 import time
 
 
+
 class Scraper:
     def __init__(self, url):
         self.url = url
@@ -24,10 +25,11 @@ class Scraper:
                 print(f"Изпраща заявка до {url}")
                 response = requests.get(url, headers=headers)
                 response.raise_for_status()
+                if not os.path.exists('./data'):
+                    os.makedirs('./data')
                 with open(filename, "w", encoding="utf-8") as f:
                     f.write(response.text)
                     print(f"Съдържанието е записано в: {filename}")
-
                 return response.text
             except requests.exceptions.RequestException as e:
                 print(f"Грешка при заявка: {e}")
@@ -119,6 +121,12 @@ class Scraper:
         return all_shoes
 
 
+    def has_next_page(self, html):
+        soup = BeautifulSoup(html, 'html.parser')
+        next_button = soup.find("a", {"class": "next"})
+        return next_button is not None
+    
+
     def sort_by_brand(self):
         self.shoes.sort(key=lambda x: x['brand'])
 
@@ -190,3 +198,14 @@ if __name__ == "__main__":
 # print("\nОбувки с размер 38:")
 # for shoe in filtered_by_size:
 #     print(shoe)
+
+    scraper.sort_by_brand()
+    print("Обувки, сортирани по брандове:")
+    for shoe in scraper.shoes:
+        print(shoe)
+
+
+    filtered_by_size = scraper.filter_by_size("38")
+    print("\nОбувки с размер 38:")
+    for shoe in filtered_by_size:
+        print(shoe)
