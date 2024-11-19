@@ -1,7 +1,5 @@
 import sys
 import os
-import warnings
-warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 from PyQt6 import QtWidgets as qtw
 from PyQt6 import QtCore as qtc

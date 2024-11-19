@@ -6,12 +6,13 @@ import os
 import sys
 
 
+
 try:
     from PepinaScraper.scraper import Scraper
     from PepinaScraper.db import DB
 except:
     from .scraper import Scraper
-    from db import DB
+    from .db import DB
 
 class Crawler():
 	def __init__(self, base_url, data_path='./data/'):
