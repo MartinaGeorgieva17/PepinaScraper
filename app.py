@@ -7,8 +7,12 @@ from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QMessageBox
 from PyQt6.QtSql import QSqlTableModel
 
-from PepinaScraper.scraper import Scraper
+from PepinaScraper.scraper import ProductScraper  # Вече използваме ProductScraper
 from PepinaScraper.db import DB
+
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
 
 BASE_URL = 'https://pepina.bg/products/jeni/obuvki'
 
@@ -38,7 +42,6 @@ class TableViewWidget(qtw.QWidget):
         self.model.setEditStrategy(QSqlTableModel.EditStrategy.OnFieldChange)
         self.model.select()
 
-
         # Set model to table view
         self.table_view.setModel(self.model)
 
@@ -54,7 +57,6 @@ class TableViewWidget(qtw.QWidget):
 
         # Apply filter if there's a size input, otherwise clear filter
         if size:
-            # Use FIND_IN_SET for CSV string filtering
             self.model.setFilter(f"FIND_IN_SET('{size}', sizes) > 0")
         else:
             self.model.setFilter("")  # Clear the filter
@@ -74,31 +76,35 @@ class MainWindow(qtw.QMainWindow):
         self.setup_gui()
 
     def setup_gui(self):
-        layout = qtw.QVBoxLayout() #Основен вертикален лейаут
+        layout = qtw.QVBoxLayout()  # Основен вертикален лейаут
 
-        #Главна картинка - основен прозорец
+        # Главна картинка - основен прозорец
         img_label = qtw.QLabel(self)
-        pixmap = QPixmap('./PepinaScraper/images/PepinaScraper.png')
+        
+        # Използване на динамичен път към изображението
+        base_path = os.path.dirname(os.path.abspath(__file__))
+        pixmap_path = os.path.join(base_path, 'PepinaScraper/images/PepinaScraper.png')
+        pixmap = QPixmap(pixmap_path)
         pixmap = pixmap.scaled(600, 400, qtc.Qt.AspectRatioMode.KeepAspectRatio)
         img_label.setPixmap(pixmap)
         img_label.setAlignment(qtc.Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(img_label)
 
-        #Главен бутон за стартиране на скрейпа
+        # Главен бутон за стартиране на скрейпа
         btnRunScraper = qtw.QPushButton('Стартиране на Скрейп')
-        btnRunScraper.clicked.connect(self.run_scraper) #При натиск на бутона -стартира
+        btnRunScraper.clicked.connect(self.run_scraper)  # При натиск на бутона - стартира
         layout.addWidget(btnRunScraper)
 
-        #Бутон за показване на данните в таблица
+        # Бутон за показване на данните в таблица
         self.btnShowData = qtw.QPushButton("Показване на данните")
-        self.btnShowData.clicked.connect(self.show_data) #При натискане с епоказват данните
+        self.btnShowData.clicked.connect(self.show_data)  # При натискане се показват данните
         layout.addWidget(self.btnShowData)
 
-        #Основен widget с layout
+        # Основен widget с layout
         mainWidget = qtw.QWidget()
         mainWidget.setLayout(layout)
         self.setCentralWidget(mainWidget)
-        self.show() #Показване на прозореца
+        self.show()  # Показване на прозореца
 
     def run_scraper(self):
         '''Функция за стартиране на скрейпване'''
@@ -111,33 +117,28 @@ class MainWindow(qtw.QMainWindow):
             return
 
         try:
-            scraper = Scraper(BASE_URL)
+            scraper = ProductScraper(BASE_URL)  # Използваме ProductScraper
             scraper.run()
             self.db.insert_rows(scraper.shoes_data)
         except Exception as e:
             qtw.QMessageBox.critical(self, "Грешка", f"Скрейпингът не е извършен: {str(e)}")
 
-        # Изпълняваме select отново, за да презаредим данните във view-то
-        self.tableViewWidget.model.select()
+        # Презареждаме данните в таблицата, ако тя съществува
+        if hasattr(self, "tableViewWidget"):
+            self.tableViewWidget.model.select()
+        else:
+            print("Table view widget не е създадено още.")
 
     def show_data(self):
-        '''Функция за показване на данните в таблица:'''
+        '''Функция за показване на данните в таблица'''
 
-        #Проверяваме дали `tableViewWidget` вече съществува, ако не - създаваме го
+        # Проверяваме дали `tableViewWidget` вече съществува, ако не - създаваме го
         if not hasattr(self, "tableViewWidget"):
             self.tableViewWidget = TableViewWidget(self.db.qsql_conn)  # Обект - създаване TableViewWidget
         self.tableViewWidget.show()  # Показване на таблицата
 
 
 if __name__ == '__main__':
-    app = qtw.QApplication(sys.argv) #Създаваме приложението
-
-    # base_url = 'https://pepina.bg/products/jeni/obuvki'
-    # try:
-    #     crawler = Crawler(base_url)
-    #     crawler.run()
-    # except Exception as e:
-    #     qtw.QMessageBox.critical(None, "Грешка при Crawler", f"Процесът на краулинг се провали: {str(e)}")
-
-    window = MainWindow() #Създаваме главен прозорец
-    sys.exit(app.exec()) #Стартиране на основни цикъл на приложението
+    app = qtw.QApplication(sys.argv)  # Създаваме приложението
+    window = MainWindow()  # Създаваме главен прозорец
+    sys.exit(app.exec())  # Стартиране на основния цикъл на приложението
