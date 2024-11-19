@@ -1,201 +1,172 @@
-import json
-
-from PyQt6.QtSql import QSqlDatabase
-import mysql.connector as mc
-
-from PepinaScraper.read_config import read_db_config
-from .read_config import read_db_config
+import sqlite3
+from PyQt6 import QtWidgets as qtw
+from PyQt6.QtCore import Qt
 
 
+class DB:
+    def __init__(self, db_path='products.db'):
+        self.db_path = db_path  # Път към базата данни
+        self.conn = None
+        self.connect()
+        self.create_table()
 
-# Свързване с базата данни
-class DB():
-    def __init__(self):
-        mysql_config = read_db_config('config.ini', 'mysql')
+    def connect(self):
+        """Свързване с базата данни"""
         try:
-            self.conn = mc.connect(**mysql_config)
-            print("Успешно свързване към базата с данни!")
-        except mc.Error as e:
-            print(f"Грешка при свързване с Mysql: {e}")
-            raise Exception("Неуспешно свързване с базата данни!")
+            self.conn = sqlite3.connect(self.db_path)
+            print(f"Successfully connected to {self.db_path}")
+        except sqlite3.Error as e:
+            print(f"Error connecting to database: {e}")
+            self.conn = None
 
-        # Register QSqlDatabase connection to be used with QSqlTableModel
-        self.qsql_conn = self._setup_qt_database(mysql_config)
-
-
-    def _setup_qt_database(self, config):
-        """
-        Creates and registers a QSqlDatabase connection
-        """
-        db = QSqlDatabase.addDatabase("QMYSQL", "qt_connection")
-        db.setHostName(config['host'])
-        db.setDatabaseName(config['database'])
-        db.setUserName(config['user'])
-        db.setPassword(config['password'])
-        if not db.open():
-            print(f"Грешка при отваряне на QSqlDatabase: {db.lastError().text()}")
-            raise Exception("QSqlDatabase не можа да се свърже.")
-        print("Успешно свързване към базата чрез QSqlDatabase!")
-        return db
-
-
-    # Проверява и възстановява връзката към базата данни
-    def check_connection(self):
-        if not self.conn.is_connected():
+    def create_table(self):
+        """Създаване на таблицата `products`, ако не съществува"""
+        if self.conn:
             try:
-                self.conn.reconnect(attempts=3, delay=2)
-                print("Възстановна връзка към базата данни")
-            except mc.Error as e:
-                print(f"Неуспешно възстановяване на връзката: {e}")
-                raise  # Генерираме грешка, която можем да хванем
-
-    # Създаваме таблица "shoes", ако не съществува
-    def create_shoes_table(self):
-        sql = """
-            CREATE TABLE IF NOT EXISTS shoes(
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                brand VARCHAR(100) NOT NULL,
-                price DECIMAL(10,2) NOT NULL,
-                color VARCHAR(50) NOT NULL,
-                sizes VARCHAR(255) NOT NULL,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-                CONSTRAINT brand_color_size UNIQUE (brand, color, sizes)
-            );
-        """
-        self.check_connection()
-        try:
-            with self.conn.cursor() as cursor:
-                cursor.execute(sql)
+                cursor = self.conn.cursor()
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS products (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        brand TEXT,
+                        price REAL,
+                        color TEXT,
+                        size REAL
+                    )
+                ''')
                 self.conn.commit()
-                print(f'Таблицата с обувки е създадена!')
-        except mc.Error as e:
-            print(f"Грешка при създаване на таблица: {e}")
-            self.conn.rollback()
+                print("Table 'products' is ready.")
+            except sqlite3.Error as e:
+                print(f"Error creating table: {e}")
 
-    # Изтриваме таблицата "shoes", ако съществува
-    def drop_shoes_table(self):
-        sql = "DROP TABLE IF EXISTS shoes;"
-        self.check_connection()
-        try:
-            with self.conn.cursor() as cursor:
-                cursor.execute(sql)
+    def insert_row(self, product):
+        """Метод за вмъкване на продукт в базата данни"""
+        if self.conn:
+            try:
+                cursor = self.conn.cursor()
+                cursor.execute(
+                    "INSERT INTO products (brand, price, color, size) VALUES (?, ?, ?, ?)",
+                    (product['brand'], product['price'], product['color'], product['size'])
+                )
                 self.conn.commit()
-                print(f"Таблицата 'shoes' е изтрита успешно!")
-        except mc.Error as e:
-            print(f"Грешка при изтриване на таблицата: {e}")
-            self.conn.rollback()
+            except sqlite3.Error as e:
+                print(f"Error inserting product: {e}")
 
-    def insert_rows(self, rows_data):
-        '''# Добавя множество редове в таблицата'''
-        sql = """
-            INSERT INTO shoes
-            (brand, price, color, sizes)
-            VALUES (%s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE price=VALUES(price), sizes=VALUES(sizes)
-        """
-        self.check_connection()
-        try:
-            with self.conn.cursor() as cursor:
-                # Подготвяме данните за вмъкване, като преобразуваме 'sizes' списъка в CSV стринг
-                data = [
-                    (row['brand'], row['price'], row['color'], ",".join(map(str, row['sizes'])))
-                    for row in rows_data
-                ]
-                cursor.executemany(sql, data)  # Вмъкваме всички редове с една заявка
-            self.conn.commit()
-            print(f"Добавени са {len(rows_data)} редове!")
-        except mc.Error as e:
-            print(f"Грешка при вмъкване на редове: {e}!")
-            self.conn.rollback()
-
-
-    # Добавя един ред след валидиране
-    def insert_row(self, row_data):
-        if not row_data.get('brand') or not row_data.get('color'):
-            print("Липсва информация за бранда или цвета")
-            return
-
-        if row_data.get('price', 0) >= 1000:
-            print("Цена над 1000 лева не може да бъде добавена!")
-            return
-
-        sql = """
-            INSERT IGNORE INTO shoes
-            (brand, price, color, sizes)
-            VALUES (%s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE price=VALUES(price), sizes=VALUES(sizes)
-        """
-        self.check_connection()
-        try:
-            with self.conn.cursor() as cursor:
-                cursor.execute(sql, tuple(row_data.values()))
-                self.conn.commit()
-                print(f"Добавен ред: {row_data}!")
-        except mc.Error as e:
-            print(f"Грешка при вмъкване на редове: {e}!")
-            self.conn.rollback()
-
-    # Извлича всички данни от таблицата
     def select_all_data(self):
-        sql = "SELECT id, brand, price, color FROM shoes"
-        self.check_connection()
-        try:
-            with self.conn.cursor() as cursor:
-                cursor.execute(sql)
-                result = cursor.fetchall()
-                return result if result else []
-        except mc.Error as e:
-            print(f"Грешка при извличане на данни: {e}")
-            return []
+        """Извличане на всички данни от базата данни"""
+        if self.conn:
+            try:
+                cursor = self.conn.cursor()
+                cursor.execute("SELECT * FROM products")
+                return cursor.fetchall()
+            except sqlite3.Error as e:
+                print(f"Error fetching all data: {e}")
+                return []
+        return []
 
-    # Извлича данни от таблицата със сортиране
-    def select_all_data_sorted(self, column="price", ascending=True):
-        valid_columns = {"price", "brand", "color", "sizes"}  # Разрешение за сортиране
-        if column not in valid_columns:
-            raise ValueError(f"Невалидна колона за сортиране: {column}")
-
-        order = 'ASC' if ascending else 'DESC'
-        sql = f"SELECT id, brand, price, color, sizes FROM shoes ORDER BY {column} {order}"
-        self.check_connection()
-        try:
-            with self.conn.cursor() as cursor:
-                cursor.execute(sql)
-                result = cursor.fetchall()
-                return result if result else []
-        except mc.Error as e:
-            print(f"Грешка при сортиране: {e}")
-            return []
-
-    # Филтрира данни по размер
     def select_data_by_size(self, size):
-        sql = "SELECT id, brand, price, color, sizes FROM shoes WHERE FIND_IN_SET(%s, sizes) > 0;"
-        self.check_connection()
-        try:
-            with self.conn.cursor() as cursor:
-                cursor.execute(sql, (size,))
-                result = cursor.fetchall()
-                return result if result else []
-        except mc.Error as e:
-            print(f"Грешка при извличане на данни по размер: {e}")
-            return []
+        """Извличане на данни по размер (например за обувки)"""
+        if self.conn:
+            try:
+                cursor = self.conn.cursor()
+                cursor.execute("SELECT * FROM products WHERE size = ?", (size,))
+                return cursor.fetchall()
+            except sqlite3.Error as e:
+                print(f"Error fetching data by size: {e}")
+                return []
+        return []
 
-    # Извлича последната дата на обновяване
-    def get_last_updated_date(self):
-        sql = 'SELECT MAX(updated_at) FROM shoes;'
-        self.check_connection()
+    def close(self):
+        """Затваряне на връзката с базата данни"""
+        if self.conn:
+            self.conn.close()
+            self.conn = None
+
+
+# Примерен GUI компонент за филтриране по размер
+class DataTable(qtw.QTableWidget):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.db = DB()  # Връзка с базата данни
+        if not self.db.conn:
+            qtw.QMessageBox.critical(None, "Грешка на базата данни!", "Провалена връзка с базата данни.")
+            return
+
+        self.column_names = ["Brand", "Price", "Color", "Size"]
+        self.setup_table()
+
+    def setup_table(self):
+        """Настройване на таблицата."""
+        self.setColumnCount(len(self.column_names))
+        self.setHorizontalHeaderLabels(self.column_names)
+        self.resizeColumnsToContents()
+        self.setSortingEnabled(True)
+        self.update_table(self.db.select_all_data())
+
+    def update_table(self, data):
+        """Обновяване на таблицата с нови данни."""
+        self.setRowCount(0)
+        for row_num, row_data in enumerate(data):
+            self.insertRow(row_num)
+            for col_num, value in enumerate(row_data):
+                self.setItem(row_num, col_num, qtw.QTableWidgetItem(str(value)))
+
+    def filter_by_size(self, size):
+        """Филтриране на данните по размер."""
         try:
-            with self.conn.cursor() as cursor:
-                cursor.execute(sql)
-                result = cursor.fetchone()
-                return result[0] if result else None
-        except mc.Error as e:
-            print(f"Грешка при извличане на последната дата на обновяване: {e}.")
-            return None
+            size = float(size)  # Преобразуване на стойността в число
+            data = self.db.select_data_by_size(size)
+            if data:
+                self.update_table(data)
+            else:
+                qtw.QMessageBox.warning(None, "Няма резултати", f"Няма продукти за размер {size}.")
+        except ValueError:
+            qtw.QMessageBox.warning(None, "Грешка", "Моля, въведете валиден размер.")
+
+
+# Главен клас за работа с филтриране
+class TableViewWidget(qtw.QWidget):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setup_gui()
+
+    def setup_gui(self):
+        layout = qtw.QVBoxLayout()
+
+        self.tableView = DataTable()
+        layout.addWidget(self.tableView)
+
+        self.filter_size_input = qtw.QLineEdit(self)
+        self.filter_size_input.setPlaceholderText('Въведете размера на обувките (напр., "38")')
+        self.filter_size_input.textChanged.connect(self.on_filter_size_changed)
+        layout.addWidget(self.filter_size_input)
+
+        self.setLayout(layout)
+
+    def on_filter_size_changed(self, text):
+        """Обработване на промени в текстовото поле за размер."""
+        self.tableView.filter_by_size(text)
+
+
+# Главен прозорец на приложението
+class MainWindow(qtw.QMainWindow):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.setWindowTitle('Pepina Crawler')
+        self.setup_gui()
+
+    def setup_gui(self):
+        layout = qtw.QVBoxLayout()
+
+        self.tableViewWidget = TableViewWidget()
+        layout.addWidget(self.tableViewWidget)
+
+        mainWidget = qtw.QWidget()
+        mainWidget.setLayout(layout)
+        self.setCentralWidget(mainWidget)
+
 
 if __name__ == '__main__':
-    db = DB()
-    db.create_shoes_table()
-
-    # db.get_column_names()
-    res = db.get_last_updated_date()
-    print(res)
+    app = qtw.QApplication([])
+    window = MainWindow()
+    window.show()
+    app.exec()
