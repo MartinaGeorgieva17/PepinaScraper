@@ -11,19 +11,11 @@ BASE_URL = 'https://pepina.bg/products/jeni/obuvki'
 
 # Клас за представяне на таблицата с данни
 class DataTable(qtw.QTableWidget):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, db, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.db = DB()  # Връзка с базата данни
+        self.db=db # Приемане на съществуващата връзка с базата данни
 
-        if not self.db.conn:  # Проверка на връзката
-            qtw.QMessageBox.critical(
-                None,
-                "Грешка на базата данни!",
-                "Провалена връзка с базата данни."
-            )
-            return
-
-        self.column_names = ["Brand", "Price", "Color"]
+        self.column_names = ["id", "Brand", "Price", "Color", "Size"]
         self.setup_table()
 
     def setup_table(self):
@@ -60,15 +52,16 @@ class DataTable(qtw.QTableWidget):
 
 # Клас за управление на таблицата с филтри и сортиране
 class TableViewWidget(qtw.QWidget):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, db, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.db=db # Приемане на съществуващата връзка с базата данни
         self.setup_gui()
 
     def setup_gui(self):
         """Настройване на интерфейса."""
         layout = qtw.QVBoxLayout()
 
-        self.tableView = DataTable()
+        self.tableView = DataTable(db=self.db)
         layout.addWidget(self.tableView)
 
         self.filter_size_input = qtw.QLineEdit(self)
@@ -98,7 +91,20 @@ class MainWindow(qtw.QMainWindow):
         self.setWindowTitle('Pepina Crawler')
         self.setup_gui()
 
-        self.db = DB()  # Връзка с базата данни
+        # Връзка с базата данни - трябва да е само веднъж.
+        # Където е необходимо да се ползва, ще подаваме като аргумент
+        self.db = DB()
+
+        if not self.db.conn:  # Проверка на връзката
+            qtw.QMessageBox.critical(
+                None,
+                "Грешка на базата данни!",
+                "Провалена връзка с базата данни."
+            )
+
+        # Създаваме таблицата наново:
+        self.db.drop_table()
+        self.db.create_table()
 
     def setup_gui(self):
         """Настройка на главния прозорец."""
@@ -140,7 +146,7 @@ class MainWindow(qtw.QMainWindow):
 
     def show_data(self):
         """Показване на данните в нов прозорец."""
-        self.tableViewWidget = TableViewWidget()
+        self.tableViewWidget = TableViewWidget(db=self.db)
         self.tableViewWidget.show()
 
 

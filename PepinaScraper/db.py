@@ -16,7 +16,7 @@ class DB:
             self.config = read_db_config(config_file)
             print(self.config)
             self.connect()
-            self.create_table()
+
         except Exception as e:
             logging.error(f"Error initializing DB: {e}")
 
@@ -36,6 +36,17 @@ class DB:
             logging.error(f"Error connecting to MySQL database: {e}")
             self.conn = None
 
+    def drop_table(self):
+        """Изтриване на таблицата `products`, ако съществува"""
+        if self.conn:
+            try:
+                cursor = self.conn.cursor()
+                cursor.execute('DROP TABLE IF EXISTS products')
+                self.conn.commit()
+                logging.info("Table 'products' has been dropped.")
+            except mysql.connector.Error as e:
+                logging.error(f"Error dropping table: {e}")
+
     def create_table(self):
         """Създаване на таблицата `products`, ако не съществува"""
         if self.conn:
@@ -47,7 +58,7 @@ class DB:
                         brand VARCHAR(255),
                         price DECIMAL(10, 2),
                         color VARCHAR(50),
-                        size DECIMAL(5, 2)
+                        size VARCHAR(250)
                     )
                 ''')
                 self.conn.commit()

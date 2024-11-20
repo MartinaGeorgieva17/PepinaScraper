@@ -98,9 +98,6 @@ class ProductScraper:
         else:
             print("Не са намерени продукти в страницата!.")
 
-            # Add the product data to the list
-            self.products.append(product_data)
-
     def run(self):
         """Run the scraper."""
         print(f"Starting scraping process for '{self.search_term}'...")
