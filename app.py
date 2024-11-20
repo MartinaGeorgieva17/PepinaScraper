@@ -98,6 +98,8 @@ class MainWindow(qtw.QMainWindow):
         self.setWindowTitle('Pepina Crawler')
         self.setup_gui()
 
+        self.db = DB()  # Връзка с базата данни
+
     def setup_gui(self):
         """Настройка на главния прозорец."""
         layout = qtw.QVBoxLayout()
@@ -126,6 +128,7 @@ class MainWindow(qtw.QMainWindow):
         try:
             scraper = ProductScraper(BASE_URL, "обувки")
             scraper.run()
+            self.db.insert_rows(scraper.products)
         except Exception as e:
             qtw.QMessageBox.critical(self, "Грешка", f"Скрейпингът не е извършен: {str(e)}")
 

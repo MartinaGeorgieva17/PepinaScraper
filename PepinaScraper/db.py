@@ -55,6 +55,28 @@ class DB:
             except mysql.connector.Error as e:
                 logging.error(f"Error creating table: {e}")
 
+    def insert_rows(self, rows_data):
+        '''# Добавя множество редове в таблицата'''
+        sql = """
+            INSERT INTO products
+            (brand, price, color, sizes)
+            VALUES (%s, %s, %s, %s)
+            ON DUPLICATE KEY UPDATE price=VALUES(price), sizes=VALUES(sizes)
+        """
+        try:
+            with self.conn.cursor() as cursor:
+                # Подготвяме данните за вмъкване, като преобразуваме 'sizes' списъка в CSV стринг
+                data = [
+                    (row['brand'], row['price'], row['color'], ",".join(map(str, row['sizes'])))
+                    for row in rows_data
+                ]
+                cursor.executemany(sql, data)  # Вмъкваме всички редове с една заявка
+            self.conn.commit()
+            print(f"Добавени са {len(rows_data)} редове!")
+        except mysql.connector.Error as e:
+            print(f"Грешка при вмъкване на редове: {e}!")
+            self.conn.rollback()
+
     def insert_row(self, product):
         """Метод за вмъкване на продукт в базата данни"""
         if self.conn:
