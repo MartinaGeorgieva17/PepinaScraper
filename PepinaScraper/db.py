@@ -1,6 +1,6 @@
 import mysql.connector
 import logging
-import configparser
+from .read_config import read_db_config
 from PyQt6 import QtWidgets as qtw
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QDoubleValidator
@@ -13,39 +13,25 @@ class DB:
     def __init__(self, config_file='config.ini'):
         self.conn = None
         try:
-            self.config = self.load_config(config_file)
+            self.config = read_db_config(config_file)
+            print(self.config)
             self.connect()
             self.create_table()
         except Exception as e:
             logging.error(f"Error initializing DB: {e}")
 
-    def load_config(self, config_file):
-        """Зарежда конфигурацията от INI файл."""
-        config = configparser.ConfigParser()
-        config.read(config_file)
-        
-        if not config.sections():
-            logging.critical(f"Config file '{config_file}' is empty or unreadable.")
-            raise FileNotFoundError(f"Config file '{config_file}' could not be read or is empty.")
-        
-        if 'mysql' not in config:
-            logging.critical(f"Missing 'mysql' section in config file: {config_file}")
-            raise KeyError("'mysql' section is missing in the config file.")
-        
-        logging.info(f"Config loaded from {config_file}")
-        return config['mysql']
 
     def connect(self):
         """Свързване с MySQL базата данни"""
         try:
             self.conn = mysql.connector.connect(
-                host=self.config['HOST'],
-                user=self.config['USER'],
-                password=self.config['PASSWORD'],
-                database=self.config['DATABASE'],
-                port=int(self.config.get('PORT', 3306))  # По подразбиране 3306
+                host=self.config['host'],
+                user=self.config['user'],
+                password=self.config['password'],
+                database=self.config['database'],
+                port=int(self.config.get('port', 3306))  # По подразбиране 3306
             )
-            logging.info(f"Successfully connected to MySQL database: {self.config['DATABASE']}")
+            logging.info(f"Successfully connected to MySQL database: {self.config['database']}")
         except mysql.connector.Error as e:
             logging.error(f"Error connecting to MySQL database: {e}")
             self.conn = None
