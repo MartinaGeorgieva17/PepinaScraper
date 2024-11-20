@@ -35,13 +35,6 @@ class DB:
         logging.info(f"Config loaded from {config_file}")
         return config['mysql']
 
-    def __enter__(self):
-        self.connect()
-        return self
-
-    def __exit__(self, exc_type, exc_value, traceback):
-        self.close()
-
     def connect(self):
         """Свързване с MySQL базата данни"""
         try:
@@ -103,18 +96,6 @@ class DB:
                 return []
         return []
 
-    def select_data_by_size(self, size):
-        """Извличане на данни по размер"""
-        if self.conn:
-            try:
-                cursor = self.conn.cursor()
-                cursor.execute("SELECT * FROM products WHERE size = %s", (size,))
-                return cursor.fetchall()
-            except mysql.connector.Error as e:
-                logging.error(f"Error fetching data by size: {e}")
-                return []
-        return []
-
     def close(self):
         """Затваряне на връзката с базата данни"""
         if self.conn:
@@ -127,7 +108,7 @@ class DB:
         return self.conn is not None
 
 
-# Примерен GUI компонент за филтриране по размер
+# GUI част за добавяне на продукт
 class DataTable(qtw.QTableWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -160,47 +141,17 @@ class DataTable(qtw.QTableWidget):
             for col_num, value in enumerate(row_data):
                 self.setItem(row_num, col_num, qtw.QTableWidgetItem(str(value)))
 
-    def filter_by_size(self, size):
-        """Филтриране на данните по размер."""
-        if not self.db:
-            qtw.QMessageBox.critical(None, "Грешка", "Няма връзка с базата данни.")
-            return
-        try:
-            size = float(size)  # Преобразуване на стойността в число
-            data = self.db.select_data_by_size(size)
-            if data:
-                self.update_table(data)
-            else:
-                qtw.QMessageBox.warning(None, "Няма резултати", f"Няма продукти за размер {size}.")
-        except ValueError:
-            qtw.QMessageBox.warning(None, "Грешка", "Моля, въведете валиден размер.")
-
-
-# Главен клас за работа с филтриране
-class TableViewWidget(qtw.QWidget):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.setup_gui()
-
-    def setup_gui(self):
-        layout = qtw.QVBoxLayout()
-
-        self.tableView = DataTable()
-        layout.addWidget(self.tableView)
-
-        self.filter_size_input = qtw.QLineEdit(self)
-        self.filter_size_input.setPlaceholderText('Въведете размера на обувките (напр., "38")')
-        validator = QDoubleValidator(0.0, 50.0, 2)  # Валидация за валиден размер
-        self.filter_size_input.setValidator(validator)
-        self.filter_size_input.textChanged.connect(self.on_filter_size_changed)
-        layout.addWidget(self.filter_size_input)
-
-        self.setLayout(layout)
-
-    def on_filter_size_changed(self, text):
-        """Обработване на промени в текстовото поле за размер."""
-        self.tableView.filter_by_size(text)
-
+    def add_product(self, brand, price, color, size):
+        """Добавяне на продукт в базата данни"""
+        if self.db:
+            product = {
+                'brand': brand,
+                'price': price,
+                'color': color,
+                'size': size
+            }
+            self.db.insert_row(product)
+            self.update_table(self.db.select_all_data())
 
 # Главен прозорец на приложението
 class MainWindow(qtw.QMainWindow):
@@ -212,12 +163,22 @@ class MainWindow(qtw.QMainWindow):
     def setup_gui(self):
         layout = qtw.QVBoxLayout()
 
-        self.tableViewWidget = TableViewWidget()
-        layout.addWidget(self.tableViewWidget)
+        self.data_table = DataTable()
+        layout.addWidget(self.data_table)
 
-        mainWidget = qtw.QWidget()
-        mainWidget.setLayout(layout)
-        self.setCentralWidget(mainWidget)
+        self.add_button = qtw.QPushButton('Добави продукт')
+        self.add_button.clicked.connect(self.on_add_product)
+        layout.addWidget(self.add_button)
+
+        self.setLayout(layout)
+
+    def on_add_product(self):
+        """Тестово добавяне на продукт"""
+        brand = 'Nike'
+        price = 99.99
+        color = 'Red'
+        size = 42.5
+        self.data_table.add_product(brand, price, color, size)
 
 
 if __name__ == '__main__':
@@ -228,8 +189,7 @@ if __name__ == '__main__':
 
 
 
-
-#Вариант две с sqlite:
+#Вариант 2 с sqlite: Зарежда нов прозорец с бутони и опция за филтриране, зарежда нов файл products.db
 
 # import sqlite3
 # import logging
@@ -424,4 +384,3 @@ if __name__ == '__main__':
 #     window = MainWindow()
 #     window.show()
 #     app.exec()
-
