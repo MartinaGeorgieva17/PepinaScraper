@@ -39,50 +39,64 @@ class ProductScraper:
                 print(f"Request error: {e}")
                 return None
 
+    def extract_price(self, text):
+        # regex за валидна цена (e.g., 720, 720.95).
+        match = re.search(r'\b\d+(?:\.\d{1,2})?\b', text)
+        if match:
+            # връщаме цената като реално число
+            return float(match.group())
+        return None
+
+
     def parse_products(self, html):
         """Parse products from a single page."""
         soup = BeautifulSoup(html, 'html.parser')
 
-        # Find all product containers
-        product_containers = soup.find_all("a", class_="product-link")
-        if not product_containers:
-            print("No products found on this page.")
-            return
+        product_containers = soup.find_all("div", class_="component-product-list-product")
+        if product_containers:
+            for container in product_containers:
+                shoe_data = {}
 
-        for container in product_containers:
-            product_data = {}
+                # Първо проверяваме цената - ако е >1000 няма смисъл да визмаме
+                # каквито и да е данни
+                price_tag = container.find("div", class_="regular-price")
+                if price_tag:
+                    price_text = price_tag.text.strip()
 
-            # Extract link
-            link = container.get('href', '')
-            product_data["link"] = f"https://pepina.bg{link}" if link else None
+                    price =self.extract_price(price_text)
 
-            # Extract brand
-            brand_tag = container.find("div", class_="brand")
-            product_data["brand"] = brand_tag.text.strip() if brand_tag else "Unknown Brand"
+                    if price and price < 1000:
+                        shoe_data["price"] = price
+                    else:
+                        continue # skip loop if price doesn't meet condition
+                else:
+                    continue # skip loop if price_tag is not found
 
-            # Extract title
-            title_tag = container.find("div", class_="title")
-            product_data["title"] = title_tag.text.strip() if title_tag else "No Title"
+                link_tag = container.find("a", class_="product-link")
+                shoe_data["link"] = link_tag['href'] if link_tag else None
 
-            # Extract price
-            price_tag = container.find("div", class_="regular-price")
-            if price_tag:
-                price_text = price_tag.text.strip()
-                try:
-                    price = float(price_text.replace("лв.", "").strip())
-                    product_data["price"] = price
-                except ValueError:
-                    product_data["price"] = None
-            else:
-                product_data["price"] = None
+                # img_tag = container.find("div", class_="main-image").find("img")
+                # shoe_data["image"] = img_tag['src'] if img_tag else None
 
-            # Extract sizes
-            size_container = container.find("div", class_="available-configurations")
-            if size_container:
-                sizes = [size.text.strip() for size in size_container.find_all("div", class_="value")]
-                product_data["sizes"] = sizes
-            else:
-                product_data["sizes"] = []
+                brand_tag = container.find("div", class_="brand")
+                shoe_data["brand"] = brand_tag.text.strip() if brand_tag else None
+
+                title_tag = container.find("div", class_="title")
+                shoe_data["title"] = title_tag.text.strip() if title_tag else None
+
+
+                color_tag = container.find("div", class_="color")
+                shoe_data["color"] = color_tag.text.strip() if color_tag else "N/A"
+
+                size_tags = container.find("div", class_="available-configurations")
+                if size_tags:
+                    shoe_data["sizes"] = [size.text.strip() for size in size_tags.find_all("div", class_="value")]
+                else:
+                    shoe_data["sizes"] = []
+
+                self.products.append(shoe_data)
+        else:
+            print("Не са намерени продукти в страницата!.")
 
             # Add the product data to the list
             self.products.append(product_data)

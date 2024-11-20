@@ -59,9 +59,9 @@ class DB:
         '''# Добавя множество редове в таблицата'''
         sql = """
             INSERT INTO products
-            (brand, price, color, sizes)
+            (brand, price, color, size)
             VALUES (%s, %s, %s, %s)
-            ON DUPLICATE KEY UPDATE price=VALUES(price), sizes=VALUES(sizes)
+            ON DUPLICATE KEY UPDATE price=VALUES(price), size=VALUES(size)
         """
         try:
             with self.conn.cursor() as cursor:

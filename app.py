@@ -128,9 +128,15 @@ class MainWindow(qtw.QMainWindow):
         try:
             scraper = ProductScraper(BASE_URL, "обувки")
             scraper.run()
-            self.db.insert_rows(scraper.products)
         except Exception as e:
             qtw.QMessageBox.critical(self, "Грешка", f"Скрейпингът не е извършен: {str(e)}")
+
+
+        # Запис на скрейпнатите данни в базата
+        try:
+            self.db.insert_rows(scraper.products)
+        except Exception as e:
+            print(f'Грешка при запис в базата: {e}')
 
     def show_data(self):
         """Показване на данните в нов прозорец."""
