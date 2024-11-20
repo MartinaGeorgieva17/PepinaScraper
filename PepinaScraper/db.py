@@ -1,6 +1,11 @@
 import sqlite3
+import logging
 from PyQt6 import QtWidgets as qtw
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QDoubleValidator
+
+# Настройка на логер
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 class DB:
@@ -10,13 +15,20 @@ class DB:
         self.connect()
         self.create_table()
 
+    def __enter__(self):
+        self.connect()
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+
     def connect(self):
         """Свързване с базата данни"""
         try:
             self.conn = sqlite3.connect(self.db_path)
-            print(f"Successfully connected to {self.db_path}")
+            logging.info(f"Successfully connected to {self.db_path}")
         except sqlite3.Error as e:
-            print(f"Error connecting to database: {e}")
+            logging.error(f"Error connecting to database: {e}")
             self.conn = None
 
     def create_table(self):
@@ -34,9 +46,9 @@ class DB:
                     )
                 ''')
                 self.conn.commit()
-                print("Table 'products' is ready.")
+                logging.info("Table 'products' is ready.")
             except sqlite3.Error as e:
-                print(f"Error creating table: {e}")
+                logging.error(f"Error creating table: {e}")
 
     def insert_row(self, product):
         """Метод за вмъкване на продукт в базата данни"""
@@ -48,18 +60,20 @@ class DB:
                     (product['brand'], product['price'], product['color'], product['size'])
                 )
                 self.conn.commit()
+                logging.info(f"Inserted product: {product}")
             except sqlite3.Error as e:
-                print(f"Error inserting product: {e}")
+                logging.error(f"Error inserting product: {e}")
 
-    def select_all_data(self):
+    def select_all_data(self, order_by='id'):
         """Извличане на всички данни от базата данни"""
         if self.conn:
             try:
                 cursor = self.conn.cursor()
-                cursor.execute("SELECT * FROM products")
+                query = f"SELECT * FROM products ORDER BY {order_by}"
+                cursor.execute(query)
                 return cursor.fetchall()
             except sqlite3.Error as e:
-                print(f"Error fetching all data: {e}")
+                logging.error(f"Error fetching all data: {e}")
                 return []
         return []
 
@@ -71,7 +85,7 @@ class DB:
                 cursor.execute("SELECT * FROM products WHERE size = ?", (size,))
                 return cursor.fetchall()
             except sqlite3.Error as e:
-                print(f"Error fetching data by size: {e}")
+                logging.error(f"Error fetching data by size: {e}")
                 return []
         return []
 
@@ -80,6 +94,11 @@ class DB:
         if self.conn:
             self.conn.close()
             self.conn = None
+            logging.info("Database connection closed.")
+
+    def is_connected(self):
+        """Проверка на състоянието на връзката с базата"""
+        return self.conn is not None
 
 
 # Примерен GUI компонент за филтриране по размер
@@ -87,11 +106,11 @@ class DataTable(qtw.QTableWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.db = DB()  # Връзка с базата данни
-        if not self.db.conn:
+        if not self.db.is_connected():
             qtw.QMessageBox.critical(None, "Грешка на базата данни!", "Провалена връзка с базата данни.")
             return
 
-        self.column_names = ["Brand", "Price", "Color", "Size"]
+        self.column_names = ["ID", "Brand", "Price", "Color", "Size"]
         self.setup_table()
 
     def setup_table(self):
@@ -137,6 +156,8 @@ class TableViewWidget(qtw.QWidget):
 
         self.filter_size_input = qtw.QLineEdit(self)
         self.filter_size_input.setPlaceholderText('Въведете размера на обувките (напр., "38")')
+        validator = QDoubleValidator(0.0, 50.0, 2)  # Валидация за валиден размер
+        self.filter_size_input.setValidator(validator)
         self.filter_size_input.textChanged.connect(self.on_filter_size_changed)
         layout.addWidget(self.filter_size_input)
 
