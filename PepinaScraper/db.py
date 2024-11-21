@@ -1,3 +1,6 @@
+#Код предназначен за управление на базата данни и свързване към нея. 
+# В него има два различни подхода - с MySQL и SQLite.
+
 import mysql.connector
 import logging
 import configparser

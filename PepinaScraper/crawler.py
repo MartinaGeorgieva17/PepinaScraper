@@ -1,3 +1,8 @@
+#crawler.py - обхожда страници
+# от уебсайт, извлича данни за продукти и ги
+# записва в база данни. 
+# Класът Crawler обединява скрейпинга и управлението на данни в една структура.
+
 from PepinaScraper.db import DB
 from PepinaScraper.scraper import ProductScraper
 import requests
