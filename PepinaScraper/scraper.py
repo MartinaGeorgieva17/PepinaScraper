@@ -1,10 +1,7 @@
-#Скрипт за уеб скрейпинг - извлича данни за продукти от даден уебсайт. 
-
-import re
-import requests
+import sqlite3
 import os
+import requests
 from bs4 import BeautifulSoup
-
 
 class ProductScraper:
     def __init__(self, base_url, search_term):
@@ -85,8 +82,48 @@ class ProductScraper:
             else:
                 product_data["sizes"] = []
 
+            # Print the product data to see it
+            print("Product Data:", product_data)
+
             # Add the product data to the list
             self.products.append(product_data)
+
+    def save_product_to_db(self, product_data):
+        """Save product to the database."""
+        conn = sqlite3.connect('products.db')
+        cursor = conn.cursor()
+
+        # Drop the existing 'products' table if it exists and recreate it
+        cursor.execute("DROP TABLE IF EXISTS products")
+
+        # Create the table with necessary columns
+        cursor.execute('''CREATE TABLE IF NOT EXISTS products (
+                          id INTEGER PRIMARY KEY AUTOINCREMENT,
+                          title TEXT,
+                          brand TEXT,
+                          price REAL,
+                          sizes TEXT,
+                          link TEXT)''')
+
+        # Insert the product data into the database
+        cursor.execute('''INSERT INTO products (title, brand, price, sizes, link)
+                          VALUES (?, ?, ?, ?, ?)''', 
+                       (product_data['title'], 
+                        product_data['brand'], 
+                        product_data['price'], 
+                        ', '.join(product_data['sizes']),  # Convert list to string
+                        product_data['link']))
+
+        conn.commit()
+
+        # Fetch and print the data from the database to verify
+        cursor.execute("SELECT * FROM products")
+        rows = cursor.fetchall()
+        print("Database contents after insertion:")
+        for row in rows:
+            print(row)
+
+        conn.close()
 
     def run(self):
         """Run the scraper."""

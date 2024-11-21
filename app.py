@@ -1,10 +1,3 @@
-# Кодът в app.py представлява 
-# графичен потребителски интерфейс GUI за скрейпване и управление на 
-# данни от уебсайта Pepina. 
-# Той използва PyQt6 за изграждане на интерфейса и предоставя функции
-# като стартиране на скрейпър, преглед на данни,
-#  филтриране и сортиране на информация. 
-
 import sys
 from PyQt6 import QtWidgets as qtw
 from PyQt6 import QtCore as qtc
@@ -58,6 +51,15 @@ class DataTable(qtw.QTableWidget):
         except ValueError:
             qtw.QMessageBox.warning(None, "Грешка", "Моля, въведете валиден номер.")
 
+    def filter_by_price(self, max_price):
+        """Филтриране на данните по максимална цена."""
+        try:
+            max_price = float(max_price)
+            data = [product for product in self.db.select_all_data() if product[1] <= max_price]
+            self.update_table(data)
+        except ValueError:
+            qtw.QMessageBox.warning(None, "Грешка", "Моля, въведете валидна цена.")
+
     def sort_by_price(self, ascending=True):
         """Сортиране на таблицата по цена."""
         column = 1
@@ -83,6 +85,11 @@ class TableViewWidget(qtw.QWidget):
         self.filter_size_input.textChanged.connect(self.tableView.filter_by_size)
         layout.addWidget(self.filter_size_input)
 
+        self.filter_price_input = qtw.QLineEdit(self)
+        self.filter_price_input.setPlaceholderText('Въведете максимална цена')
+        self.filter_price_input.textChanged.connect(self.on_filter_price_changed)
+        layout.addWidget(self.filter_price_input)
+
         btnSortAsc = qtw.QPushButton("Сортиране по възходящ ред.")
         btnSortAsc.clicked.connect(lambda: self.tableView.sort_by_price(ascending=True))
         layout.addWidget(btnSortAsc)
@@ -96,6 +103,10 @@ class TableViewWidget(qtw.QWidget):
         layout.addWidget(btnClose)
 
         self.setLayout(layout)
+
+    def on_filter_price_changed(self, text):
+        """Обработване на промени в текстовото поле за максимална цена."""
+        self.tableView.filter_by_price(text)
 
 
 # Главен прозорец на приложението
