@@ -6,7 +6,7 @@ from PepinaScraper.scraper import ProductScraper
 from PepinaScraper.db import DB
 
 
-#APP - комбинация от графичен интерфейс с функционалност за уеб скрейпинг и управление на бази данни.
+#app.py - комбинация от графичен интерфейс с функционалност за уеб скрейпинг и управление на бази данни.
 #Основни компоненти на приложението: DataTable, TableViewWidget, MainWindow;
 #Стартиране на скрейпинг, Преглед на данните, Интерактивен интерфейс, Графичен интерфейс, База данни
 
@@ -30,7 +30,7 @@ class DataTable(qtw.QTableWidget):
 
         self.column_names = ["Brand", "Price", "Color"]
         self.setup_table()
-        
+
 
     def setup_table(self):
         """Настройване на таблицата."""
