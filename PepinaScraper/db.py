@@ -8,10 +8,15 @@ from PyQt6 import QtWidgets as qtw
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QDoubleValidator
 
-# Logging setup
+#Създава и управлява SQLite база данни -- > products.db
+#Създаваме клас Db и ProductScraper, DataTable, MainWindow
+#Графичен интерфейс с PyQt6 -- > DataTable, MainWindow
+
+
+# Настройки за логване - позволява прихващане на грешки 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# Database Handling Class
+# Клас за управление на базата данни
 class DB:
     def __init__(self, db_path='products.db'):
         self.db_path = db_path
@@ -20,15 +25,15 @@ class DB:
         self.create_table()
 
     def connect(self):
-        """Connect to the SQLite database."""
+        """Свързване с базата данни SQLite."""
         try:
             self.conn = sqlite3.connect(self.db_path)
-            logging.info(f"Connected to database: {self.db_path}")
+            logging.info(f"Свързано с базата данни: {self.db_path}")
         except sqlite3.Error as e:
-            logging.error(f"Database connection failed: {e}")
+            logging.error(f"Неуспешно свързване с базата данни: {e}")
 
     def create_table(self):
-        """Create products table if it doesn't exist."""
+        """Създаване на таблица `products`, ако не съществува."""
         if self.conn:
             try:
                 cursor = self.conn.cursor()
@@ -43,22 +48,22 @@ class DB:
                 ''')
                 self.conn.commit()
             except sqlite3.Error as e:
-                logging.error(f"Error creating table: {e}")
+                logging.error(f"Грешка при създаването на таблицата: {e}")
 
     def insert_row(self, product):
-        """Insert product data into the database."""
+        """Добавяне на данни за продукт в базата данни."""
         if self.conn:
             try:
                 cursor = self.conn.cursor()
                 cursor.execute("INSERT INTO products (brand, price, color, size) VALUES (?, ?, ?, ?)",
                                (product['brand'], product['price'], product['color'], product['size']))
                 self.conn.commit()
-                logging.info(f"Inserted product: {product}")
+                logging.info(f"Добавен продукт: {product}")
             except sqlite3.Error as e:
-                logging.error(f"Error inserting product: {e}")
+                logging.error(f"Грешка при добавяне на продукт: {e}")
 
     def select_all_data(self, order_by='id'):
-        """Select all data from products."""
+        """Извличане на всички данни от таблицата `products`."""
         if self.conn:
             cursor = self.conn.cursor()
             query = f"SELECT * FROM products ORDER BY {order_by}"
@@ -67,7 +72,7 @@ class DB:
         return []
 
     def select_data_by_size(self, size):
-        """Select data by shoe size."""
+        """Извличане на данни по размер на обувките."""
         if self.conn:
             cursor = self.conn.cursor()
             cursor.execute("SELECT * FROM products WHERE size = ?", (size,))
@@ -75,13 +80,13 @@ class DB:
         return []
 
     def close(self):
-        """Close the database connection."""
+        """Затваряне на връзката към базата данни."""
         if self.conn:
             self.conn.close()
             self.conn = None
-            logging.info("Database connection closed.")
+            logging.info("Връзката с базата данни е затворена.")
 
-# Web Scraper Class for Pepina
+# Клас за уеб скрейпинг на сайта Pepina
 class ProductScraper:
     def __init__(self, base_url):
         self.base_url = base_url
@@ -91,32 +96,32 @@ class ProductScraper:
         self.file_path = os.path.join(self.output_dir, self.filename)
 
     def save_html(self, content):
-        """Save the HTML content to a file."""
+        """Запазване на HTML съдържанието във файл."""
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
         with open(self.file_path, 'w', encoding='utf-8') as file:
             file.write(content)
 
     def get_html(self):
-        """Fetch HTML content of the page."""
+        """Извличане на HTML съдържание от страницата."""
         headers = {"User-Agent": "Mozilla/5.0"}
         if os.path.exists(self.file_path):
             with open(self.file_path, "r", encoding="utf-8") as f:
-                print("Loading content from local file.")
+                print("Зареждане на съдържание от локален файл.")
                 return f.read()
         else:
             try:
-                print(f"Sending request to {self.base_url}")
+                print(f"Изпращане на заявка до {self.base_url}")
                 response = requests.get(self.base_url, headers=headers)
                 response.raise_for_status()
                 self.save_html(response.text)
                 return response.text
             except requests.exceptions.RequestException as e:
-                print(f"Request error: {e}")
+                print(f"Грешка при заявката: {e}")
                 return None
 
     def parse_products(self, html):
-        """Parse product data from the page."""
+        """Парсване на данни за продукти от страницата."""
         soup = BeautifulSoup(html, 'html.parser')
         product_containers = soup.find_all("a", class_="product-link")
 
@@ -129,24 +134,24 @@ class ProductScraper:
             self.products.append(product_data)
 
     def run(self):
-        """Run the scraper to fetch and parse products."""
+        """Изпълнение на скрейпера за извличане и парсване на данни за продукти."""
         html = self.get_html()
         if html:
             self.parse_products(html)
 
-# PyQt6 GUI for Displaying and Interacting with Data
+# PyQt6 GUI за показване и взаимодействие с данни
 class DataTable(qtw.QTableWidget):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.db = DB()  
         if not self.db.conn:
-            qtw.QMessageBox.critical(None, "Database Error", "Failed to connect to the database.")
+            qtw.QMessageBox.critical(None, "Грешка с базата данни", "Неуспешно свързване с базата данни.")
             return
-        self.column_names = ["Brand", "Price", "Color"]
+        self.column_names = ["Марка", "Цена", "Цвят"]
         self.setup_table()
 
     def setup_table(self):
-        """Setup the table with data."""
+        """Конфигурация на таблицата с данни."""
         self.setColumnCount(len(self.column_names))
         self.setHorizontalHeaderLabels(self.column_names)
         self.resizeColumnsToContents()
@@ -154,7 +159,7 @@ class DataTable(qtw.QTableWidget):
         self.update_table(self.db.select_all_data())
 
     def update_table(self, data):
-        """Update the table with new data."""
+        """Актуализиране на таблицата с нови данни."""
         self.setRowCount(0)
         for row_num, row_data in enumerate(data):
             self.insertRow(row_num)
@@ -162,24 +167,24 @@ class DataTable(qtw.QTableWidget):
                 self.setItem(row_num, col_num, qtw.QTableWidgetItem(str(value)))
 
     def filter_by_size(self, size):
-        """Filter data by size."""
+        """Филтриране на данни по размер."""
         try:
             size = float(size)
             data = self.db.select_data_by_size(size)
             self.update_table(data)
         except ValueError:
-            qtw.QMessageBox.warning(None, "Invalid Input", "Please enter a valid size.")
+            qtw.QMessageBox.warning(None, "Невалиден вход", "Моля, въведете валиден размер.")
 
     def filter_by_price(self, max_price):
-        """Filter data by maximum price."""
+        """Филтриране на данни по максимална цена."""
         try:
             max_price = float(max_price)
             data = [product for product in self.db.select_all_data() if product[1] <= max_price]
             self.update_table(data)
         except ValueError:
-            qtw.QMessageBox.warning(None, "Invalid Input", "Please enter a valid price.")
+            qtw.QMessageBox.warning(None, "Невалиден вход", "Моля, въведете валидна цена.")
 
-# Main Window for the Application
+# Главен прозорец на приложението
 class MainWindow(qtw.QMainWindow):
     def __init__(self):
         super().__init__()
